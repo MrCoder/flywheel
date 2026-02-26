@@ -8,8 +8,8 @@ interface TasksByStatus {
 }
 
 const COLUMNS: { key: keyof TasksByStatus; label: string; color: string }[] = [
-  { key: "doing", label: "DOING", color: "border-amber-500" },
   { key: "todo", label: "TODO", color: "border-blue-500" },
+  { key: "doing", label: "DOING", color: "border-amber-500" },
   { key: "done", label: "DONE", color: "border-green-500" },
 ];
 
