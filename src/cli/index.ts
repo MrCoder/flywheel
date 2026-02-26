@@ -14,16 +14,16 @@ async function main() {
     case "task":
       switch (subcommand) {
         case "start":
-          if (!args[0]) { console.error("Usage: bun run cli task start <title> [--project <name>]"); process.exit(1); }
-          taskStart(args[0], parseFlag(args, "--project"));
+          if (!args[0]) { console.error("Usage: bun run cli task start <title> [--project <name>] [--parent <title>]"); process.exit(1); }
+          taskStart(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
           break;
         case "done":
           if (!args[0]) { console.error("Usage: bun run cli task done <title>"); process.exit(1); }
           taskDone(args[0]);
           break;
         case "todo":
-          if (!args[0]) { console.error("Usage: bun run cli task todo <title> [--project <name>]"); process.exit(1); }
-          taskTodo(args[0], parseFlag(args, "--project"));
+          if (!args[0]) { console.error("Usage: bun run cli task todo <title> [--project <name>] [--parent <title>]"); process.exit(1); }
+          taskTodo(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
           break;
         case "list":
           taskList();
@@ -69,6 +69,7 @@ Commands:
 
 Flags (for task/remember):
   --project <name>                         Associate with project
+  --parent <title>                         Create as subtask of parent (task only)
   --tags <comma,separated>                 Add tags (remember only)
 `);
   }

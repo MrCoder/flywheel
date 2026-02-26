@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { ulid } from "ulid";
-import { SCHEMA } from "./schema.js";
+import { SCHEMA, MIGRATIONS } from "./schema.js";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 
@@ -14,6 +14,9 @@ export function getDb(): Database {
   _db = new Database(DB_PATH);
   _db.exec("PRAGMA journal_mode = WAL");
   _db.exec(SCHEMA);
+  for (const sql of MIGRATIONS) {
+    try { _db.exec(sql); } catch { /* column already exists */ }
+  }
   return _db;
 }
 
@@ -33,6 +36,7 @@ export interface Task {
   description: string | null;
   status: "todo" | "doing" | "done";
   project: string | null;
+  parent_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -43,6 +47,7 @@ export function createTask(
   status: "todo" | "doing" | "done",
   project?: string,
   description?: string,
+  parentId?: string,
 ): Task {
   const db = getDb();
   const task: Task = {
@@ -51,14 +56,15 @@ export function createTask(
     description: description ?? null,
     status,
     project: project ?? null,
+    parent_id: parentId ?? null,
     created_at: now(),
     updated_at: now(),
     completed_at: status === "done" ? now() : null,
   };
   db.run(
-    `INSERT INTO tasks (id, title, description, status, project, created_at, updated_at, completed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [task.id, task.title, task.description, task.status, task.project, task.created_at, task.updated_at, task.completed_at],
+    `INSERT INTO tasks (id, title, description, status, project, parent_id, created_at, updated_at, completed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [task.id, task.title, task.description, task.status, task.project, task.parent_id, task.created_at, task.updated_at, task.completed_at],
   );
   return task;
 }
@@ -70,6 +76,13 @@ export function updateTaskStatus(id: string, status: "todo" | "doing" | "done"):
     `UPDATE tasks SET status = ?, updated_at = ?, completed_at = COALESCE(?, completed_at) WHERE id = ?`,
     [status, now(), completedAt, id],
   );
+}
+
+export function findTaskById(id: string): Task | null {
+  const db = getDb();
+  return db.query<Task, [string]>(
+    `SELECT * FROM tasks WHERE id = ?`,
+  ).get(id) ?? null;
 }
 
 export function findTaskByTitle(title: string): Task | null {

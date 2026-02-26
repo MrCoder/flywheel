@@ -1,17 +1,11 @@
 import { useState, useEffect } from "react";
-import { TaskCard, type Task } from "./TaskCard.js";
+import { TaskColumn, type Task } from "./TaskCard.js";
 
 interface TasksByStatus {
   todo: Task[];
   doing: Task[];
   done: Task[];
 }
-
-const COLUMNS: { key: keyof TasksByStatus; label: string; color: string }[] = [
-  { key: "todo", label: "TODO", color: "border-blue-500" },
-  { key: "doing", label: "DOING", color: "border-amber-500" },
-  { key: "done", label: "DONE", color: "border-green-500" },
-];
 
 export function Board() {
   const [tasks, setTasks] = useState<TasksByStatus>({ todo: [], doing: [], done: [] });
@@ -30,23 +24,29 @@ export function Board() {
 
   if (loading) return <div className="text-zinc-500">Loading...</div>;
 
+  const allTasks = [...tasks.todo, ...tasks.doing, ...tasks.done];
+  const topLevel = allTasks.filter((t) => !t.parent_id);
+
+  const subtasksByParent = new Map<string, Task[]>();
+  for (const t of allTasks) {
+    if (!t.parent_id) continue;
+    const list = subtasksByParent.get(t.parent_id) ?? [];
+    list.push(t);
+    subtasksByParent.set(t.parent_id, list);
+  }
+
+  if (topLevel.length === 0) {
+    return <div className="text-zinc-500 italic">No tasks</div>;
+  }
+
   return (
-    <div className="grid grid-cols-3 gap-6">
-      {COLUMNS.map((col) => (
-        <div key={col.key} className={`border-t-2 ${col.color} bg-zinc-900 rounded-lg p-4`}>
-          <h2 className="text-sm font-semibold text-zinc-400 mb-4 tracking-wide">
-            {col.label}{" "}
-            <span className="text-zinc-600">({tasks[col.key].length})</span>
-          </h2>
-          <div className="space-y-3">
-            {tasks[col.key].length === 0 && (
-              <div className="text-zinc-600 text-sm italic">No tasks</div>
-            )}
-            {tasks[col.key].map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          </div>
-        </div>
+    <div className="flex gap-4 overflow-x-auto pb-2">
+      {topLevel.map((task) => (
+        <TaskColumn
+          key={task.id}
+          task={task}
+          subtasks={subtasksByParent.get(task.id) ?? []}
+        />
       ))}
     </div>
   );

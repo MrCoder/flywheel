@@ -1,5 +1,7 @@
 import { createTask, findTaskByTitle, updateTaskStatus, listTasksByStatus, type Task } from "../db/index.js";
 
+const STATUS_ICONS: Record<string, string> = { todo: "\u00b7", doing: "\u25cb", done: "\u2713" };
+
 function formatTask(task: Task): string {
   const project = task.project ? ` [${task.project}]` : "";
   const age = timeAgo(task.updated_at);
@@ -16,14 +18,15 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export function taskStart(title: string, project?: string): void {
+export function taskStart(title: string, project?: string, parentTitle?: string): void {
   const existing = findTaskByTitle(title);
   if (existing) {
     updateTaskStatus(existing.id, "doing");
     console.log(`Moved to DOING: ${title}`);
   } else {
-    createTask(title, "doing", project);
-    console.log(`Created DOING: ${title}`);
+    const parentId = resolveParentId(parentTitle);
+    createTask(title, "doing", project, undefined, parentId);
+    console.log(`Created DOING: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
   }
 }
 
@@ -38,25 +41,50 @@ export function taskDone(title: string): void {
   }
 }
 
-export function taskTodo(title: string, project?: string): void {
-  createTask(title, "todo", project);
-  console.log(`Added TODO: ${title}`);
+export function taskTodo(title: string, project?: string, parentTitle?: string): void {
+  const parentId = resolveParentId(parentTitle);
+  createTask(title, "todo", project, undefined, parentId);
+  console.log(`Added TODO: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
 }
 
 export function taskList(): void {
   const { todo, doing, done } = listTasksByStatus();
 
+  const printColumn = (tasks: Task[], limit?: number) => {
+    const tops = tasks.filter((t) => !t.parent_id);
+    const subs = tasks.filter((t) => t.parent_id);
+    if (tops.length === 0 && subs.length === 0) { console.log("  (none)"); return; }
+    for (const t of limit ? tops.slice(0, limit) : tops) {
+      console.log(formatTask(t));
+      const children = subs.filter((s) => s.parent_id === t.id);
+      for (const c of children) {
+        console.log(`    ${STATUS_ICONS[c.status] ?? "·"} ${c.title} (${timeAgo(c.updated_at)})`);
+      }
+    }
+    // Orphan subtasks whose parent is in a different column
+    const shownParentIds = new Set(tops.map((t) => t.id));
+    const orphans = subs.filter((s) => !shownParentIds.has(s.parent_id!));
+    for (const o of orphans) console.log(formatTask(o));
+  };
+
   console.log("\n=== DOING ===");
-  if (doing.length === 0) console.log("  (none)");
-  for (const t of doing) console.log(formatTask(t));
+  printColumn(doing);
 
   console.log("\n=== TODO ===");
-  if (todo.length === 0) console.log("  (none)");
-  for (const t of todo) console.log(formatTask(t));
+  printColumn(todo);
 
   console.log("\n=== DONE (recent) ===");
-  if (done.length === 0) console.log("  (none)");
-  for (const t of done.slice(0, 10)) console.log(formatTask(t));
+  printColumn(done, 10);
 
   console.log("");
+}
+
+function resolveParentId(parentTitle?: string): string | undefined {
+  if (!parentTitle) return undefined;
+  const parent = findTaskByTitle(parentTitle);
+  if (!parent) {
+    console.error(`Parent task not found: "${parentTitle}"`);
+    process.exit(1);
+  }
+  return parent.id;
 }

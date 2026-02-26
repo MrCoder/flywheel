@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   status TEXT NOT NULL CHECK(status IN ('todo', 'doing', 'done')),
   project TEXT,
+  parent_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   completed_at TEXT
@@ -28,7 +29,13 @@ CREATE TABLE IF NOT EXISTS daily_summaries (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
 CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project);
 CREATE INDEX IF NOT EXISTS idx_memories_source ON memories(source);
 CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date);
 `;
+
+// Migrations for existing databases (ALTER TABLE ADD COLUMN fails if column exists)
+export const MIGRATIONS = [
+  `ALTER TABLE tasks ADD COLUMN parent_id TEXT`,
+];

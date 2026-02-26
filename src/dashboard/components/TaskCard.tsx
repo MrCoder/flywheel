@@ -4,10 +4,17 @@ export interface Task {
   description: string | null;
   status: string;
   project: string | null;
+  parent_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
 }
+
+const BORDER_COLORS: Record<string, string> = {
+  todo: "border-t-zinc-500",
+  doing: "border-t-amber-400",
+  done: "border-t-green-400",
+};
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -19,16 +26,50 @@ function timeAgo(iso: string): string {
   return `${days}d`;
 }
 
-export function TaskCard({ task }: { task: Task }) {
+function StatusIcon({ status }: { status: string }) {
+  if (status === "done") {
+    return <span className="text-green-400 w-4 text-center shrink-0">{"\u2713"}</span>;
+  }
+  if (status === "doing") {
+    return <span className="text-amber-400 w-4 text-center shrink-0 animate-pulse">{"\u25cb"}</span>;
+  }
+  return <span className="text-zinc-500 w-4 text-center shrink-0">{"\u00b7"}</span>;
+}
+
+function SubtaskRow({ task }: { task: Task }) {
   return (
-    <div className="bg-zinc-800 rounded-md p-3 border border-zinc-700/50">
-      <div className="text-sm font-medium text-zinc-200">{task.title}</div>
-      <div className="flex items-center gap-2 mt-2 text-xs text-zinc-500">
-        {task.project && (
-          <span className="bg-zinc-700/50 px-1.5 py-0.5 rounded">{task.project}</span>
-        )}
-        <span>{timeAgo(task.updated_at)}</span>
+    <div className="flex items-center gap-2 py-1 text-xs text-zinc-400">
+      <StatusIcon status={task.status} />
+      <span className="flex-1 truncate">{task.title}</span>
+      <span className="text-zinc-600 shrink-0">{timeAgo(task.updated_at)}</span>
+    </div>
+  );
+}
+
+export function TaskColumn({ task, subtasks = [] }: { task: Task; subtasks?: Task[] }) {
+  const borderColor = BORDER_COLORS[task.status] ?? "border-t-zinc-500";
+
+  return (
+    <div className={`border-t-2 ${borderColor} bg-zinc-900 rounded-lg p-4 min-w-[260px] w-[300px] shrink-0`}>
+      <div className="flex items-start gap-2">
+        <StatusIcon status={task.status} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-zinc-200 leading-snug">{task.title}</div>
+          <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+            {task.project && (
+              <span className="bg-zinc-700/50 px-1.5 py-0.5 rounded truncate">{task.project}</span>
+            )}
+            <span className="shrink-0">{timeAgo(task.updated_at)}</span>
+          </div>
+        </div>
       </div>
+      {subtasks.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-zinc-700/50 pl-1">
+          {subtasks.map((sub) => (
+            <SubtaskRow key={sub.id} task={sub} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
