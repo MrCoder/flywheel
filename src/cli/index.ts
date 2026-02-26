@@ -1,6 +1,7 @@
 import { morning } from "./morning.js";
 import { taskStart, taskDone, taskTodo, taskList } from "./task.js";
 import { remember, search, recent } from "./remember.js";
+import { listSkills } from "./skills.js";
 
 const [command, subcommand, ...args] = process.argv.slice(2);
 
@@ -47,6 +48,10 @@ async function main() {
       recent(subcommand ? parseInt(subcommand) : 20);
       break;
 
+    case "skills":
+      listSkills();
+      break;
+
     default:
       console.log(`
 Flywheel - Personal Work Tracker
@@ -60,6 +65,7 @@ Commands:
   bun run cli remember <content>           Save a memory
   bun run cli search <query>               Search memories
   bun run cli memories [limit]             Show recent memories
+  bun run cli skills                       List Claude skills & commands
 
 Flags (for task/remember):
   --project <name>                         Associate with project

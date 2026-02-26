@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Board } from "./components/Board.js";
 import { MemoryPanel } from "./components/MemoryPanel.js";
 import { DailySummary } from "./components/DailySummary.js";
+import { SkillsPanel } from "./components/SkillsPanel.js";
 
-type Tab = "board" | "memories" | "summary";
+type Tab = "board" | "memories" | "summary" | "skills";
 
 export function App() {
   const [tab, setTab] = useState<Tab>("board");
@@ -13,7 +14,7 @@ export function App() {
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">Flywheel</h1>
         <nav className="flex gap-1">
-          {(["board", "memories", "summary"] as Tab[]).map((t) => (
+          {(["board", "memories", "summary", "skills"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -23,7 +24,7 @@ export function App() {
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              {t === "board" ? "Board" : t === "memories" ? "Memories" : "Daily"}
+              {t === "board" ? "Board" : t === "memories" ? "Memories" : t === "summary" ? "Daily" : "Skills"}
             </button>
           ))}
         </nav>
@@ -32,6 +33,7 @@ export function App() {
         {tab === "board" && <Board />}
         {tab === "memories" && <MemoryPanel />}
         {tab === "summary" && <DailySummary />}
+        {tab === "skills" && <SkillsPanel />}
       </main>
     </div>
   );

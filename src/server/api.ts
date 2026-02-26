@@ -6,6 +6,7 @@ import {
   listDailySummaries,
   getDailySummary,
 } from "../db/index.js";
+import { collectSkills } from "../collectors/skills-collector.js";
 
 export const api = new Hono();
 
@@ -31,4 +32,8 @@ api.get("/summaries/:date", (c) => {
   const summary = getDailySummary(c.req.param("date"));
   if (!summary) return c.json({ error: "Not found" }, 404);
   return c.json({ ...summary, summary_json: JSON.parse(summary.summary_json) });
+});
+
+api.get("/skills", (c) => {
+  return c.json(collectSkills());
 });
