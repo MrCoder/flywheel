@@ -22,13 +22,14 @@ export function DailySummary() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/summaries")
-      .then((r) => r.json())
-      .then((data) => {
-        setSummaries(data as Summary[]);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    const load = () =>
+      fetch("/api/summaries")
+        .then((r) => r.json())
+        .then((data) => { setSummaries(data as Summary[]); setLoading(false); })
+        .catch(() => setLoading(false));
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
   }, []);
 
   const selectSummary = (date: string) => {

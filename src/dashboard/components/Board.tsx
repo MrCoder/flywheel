@@ -18,10 +18,14 @@ export function Board() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/tasks")
-      .then((r) => r.json())
-      .then((data) => { setTasks(data as TasksByStatus); setLoading(false); })
-      .catch(() => setLoading(false));
+    const load = () =>
+      fetch("/api/tasks")
+        .then((r) => r.json())
+        .then((data) => { setTasks(data as TasksByStatus); setLoading(false); })
+        .catch(() => setLoading(false));
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) return <div className="text-zinc-500">Loading...</div>;

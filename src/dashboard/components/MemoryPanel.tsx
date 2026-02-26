@@ -15,11 +15,16 @@ export function MemoryPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const url = query ? `/api/memories?q=${encodeURIComponent(query)}` : "/api/memories";
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => { setMemories(data as Memory[]); setLoading(false); })
-      .catch(() => setLoading(false));
+    const load = () => {
+      const url = query ? `/api/memories?q=${encodeURIComponent(query)}` : "/api/memories";
+      fetch(url)
+        .then((r) => r.json())
+        .then((data) => { setMemories(data as Memory[]); setLoading(false); })
+        .catch(() => setLoading(false));
+    };
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
   }, [query]);
 
   return (

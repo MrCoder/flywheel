@@ -14,10 +14,14 @@ export function SkillsPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/skills")
-      .then((r) => r.json())
-      .then((data) => { setSkills(data as Skill[]); setLoading(false); })
-      .catch(() => setLoading(false));
+    const load = () =>
+      fetch("/api/skills")
+        .then((r) => r.json())
+        .then((data) => { setSkills(data as Skill[]); setLoading(false); })
+        .catch(() => setLoading(false));
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
   }, []);
 
   const global = skills.filter((s) => s.source === "global");
