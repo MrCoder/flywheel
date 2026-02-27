@@ -1,7 +1,7 @@
 import { collectGitActivity } from "../collectors/git-collector.js";
 import { collectTranscripts, extractMemories } from "../collectors/transcript-collector.js";
 import { collectProjectContext } from "../collectors/file-collector.js";
-import { createMemory, saveDailySummary, listTasks, type Task } from "../db/index.js";
+import { createMemory, createTask, saveDailySummary, listTasks, listTasksForDate, findMostRecentTaskDate, hasTasksClonedFrom, today, type Task } from "../db/index.js";
 
 function yesterday(): { since: string; until: string; dateStr: string } {
   const now = new Date();
@@ -15,6 +15,63 @@ function yesterday(): { since: string; until: string; dateStr: string } {
     until: end.toISOString().split("T")[0],
     dateStr: y.toISOString().split("T")[0],
   };
+}
+
+function cloneTasksToToday(): { cloned: number; skipped: boolean } {
+  const todayStr = today();
+  const sourceDate = findMostRecentTaskDate(todayStr);
+  if (!sourceDate) return { cloned: 0, skipped: false };
+
+  if (hasTasksClonedFrom(sourceDate, todayStr)) {
+    return { cloned: 0, skipped: true };
+  }
+
+  const sourceTasks = listTasksForDate(sourceDate);
+  const incomplete = sourceTasks.filter(t => t.status !== "done");
+  if (incomplete.length === 0) return { cloned: 0, skipped: false };
+
+  const topLevel = incomplete.filter(t => !t.parent_id);
+  const subtasks = incomplete.filter(t => t.parent_id);
+
+  const subtasksByParent = new Map<string, Task[]>();
+  for (const sub of subtasks) {
+    const list = subtasksByParent.get(sub.parent_id!) ?? [];
+    list.push(sub);
+    subtasksByParent.set(sub.parent_id!, list);
+  }
+
+  let clonedCount = 0;
+
+  for (const task of topLevel) {
+    const newTask = createTask(
+      task.title, task.status, task.project ?? undefined,
+      task.description ?? undefined, undefined, todayStr, task.id,
+    );
+    clonedCount++;
+
+    const children = subtasksByParent.get(task.id) ?? [];
+    for (const sub of children) {
+      createTask(
+        sub.title, sub.status, sub.project ?? undefined,
+        sub.description ?? undefined, newTask.id, todayStr, sub.id,
+      );
+      clonedCount++;
+    }
+    subtasksByParent.delete(task.id);
+  }
+
+  // Orphan subtasks whose parent was done — promote to top-level
+  for (const [, orphans] of subtasksByParent) {
+    for (const sub of orphans) {
+      createTask(
+        sub.title, sub.status, sub.project ?? undefined,
+        sub.description ?? undefined, undefined, todayStr, sub.id,
+      );
+      clonedCount++;
+    }
+  }
+
+  return { cloned: clonedCount, skipped: false };
 }
 
 export async function morning(): Promise<void> {
@@ -66,7 +123,18 @@ export async function morning(): Promise<void> {
     console.log("\n--- No recent agent transcripts ---");
   }
 
-  // 3. Current tasks
+  // 3. Carry forward incomplete tasks from previous day
+  console.log("\nCarrying forward incomplete tasks...");
+  const cloneResult = cloneTasksToToday();
+  if (cloneResult.skipped) {
+    console.log("  (already carried forward today)");
+  } else if (cloneResult.cloned > 0) {
+    console.log(`  Carried forward ${cloneResult.cloned} tasks to today`);
+  } else {
+    console.log("  No incomplete tasks from previous day");
+  }
+
+  // 4. Current tasks (today)
   const doingTasks = listTasks("doing");
   const todoTasks = listTasks("todo");
 
@@ -86,7 +154,7 @@ export async function morning(): Promise<void> {
     }
   }
 
-  // 4. Project context for active projects
+  // 5. Project context for active projects
   const activeProjects = new Set<string>();
   for (const a of gitActivity) activeProjects.add(a.project);
   for (const t of [...doingTasks, ...todoTasks]) {
@@ -107,7 +175,7 @@ export async function morning(): Promise<void> {
     }
   }
 
-  // 5. Save daily summary
+  // 6. Save daily summary
   const summaryData = {
     date: dateStr,
     gitActivity: gitActivity.map((a) => ({

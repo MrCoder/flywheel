@@ -2,6 +2,7 @@ import { morning } from "./morning.js";
 import { taskStart, taskDone, taskTodo, taskList } from "./task.js";
 import { remember, search, recent } from "./remember.js";
 import { listSkills } from "./skills.js";
+import { createActivity } from "../db/index.js";
 
 const [command, subcommand, ...args] = process.argv.slice(2);
 
@@ -26,7 +27,7 @@ async function main() {
           taskTodo(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
           break;
         case "list":
-          taskList();
+          taskList(parseFlag(args, "--date"));
           break;
         default:
           console.error("Usage: bun run cli task <start|done|todo|list> [args]");
@@ -48,6 +49,12 @@ async function main() {
       recent(subcommand ? parseInt(subcommand) : 20);
       break;
 
+    case "log":
+      if (!subcommand) { console.error("Usage: bun run cli log <message> [--project <name>]"); process.exit(1); }
+      createActivity(subcommand, parseFlag(args, "--project"));
+      console.log(`Logged: ${subcommand}`);
+      break;
+
     case "skills":
       listSkills();
       break;
@@ -61,10 +68,11 @@ Commands:
   bun run cli task start <title>           Start a task (DOING)
   bun run cli task done <title>            Complete a task (DONE)
   bun run cli task todo <title>            Add a task (TODO)
-  bun run cli task list                    Show task board
+  bun run cli task list [--date YYYY-MM-DD] Show task board
   bun run cli remember <content>           Save a memory
   bun run cli search <query>               Search memories
   bun run cli memories [limit]             Show recent memories
+  bun run cli log <message>                 Log an activity
   bun run cli skills                       List Claude skills & commands
 
 Flags (for task/remember):

@@ -3,6 +3,7 @@ import { Board } from "./components/Board.js";
 import { MemoryPanel } from "./components/MemoryPanel.js";
 import { DailySummary } from "./components/DailySummary.js";
 import { SkillsPanel } from "./components/SkillsPanel.js";
+import { Timeline } from "./components/Timeline.js";
 
 type Tab = "board" | "memories" | "summary" | "skills";
 
@@ -30,7 +31,12 @@ export function App() {
         </nav>
       </header>
       <main className="p-6">
-        {tab === "board" && <Board />}
+        {tab === "board" && (
+          <>
+            <Board />
+            <Timeline />
+          </>
+        )}
         {tab === "memories" && <MemoryPanel />}
         {tab === "summary" && <DailySummary />}
         {tab === "skills" && <SkillsPanel />}

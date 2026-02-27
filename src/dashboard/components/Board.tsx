@@ -7,22 +7,39 @@ interface TasksByStatus {
   done: Task[];
 }
 
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function shiftDate(date: string, offset: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const shifted = new Date(y, m - 1, d + offset);
+  return formatLocalDate(shifted);
+}
+
 export function Board() {
+  const [date, setDate] = useState(todayStr);
   const [tasks, setTasks] = useState<TasksByStatus>({ todo: [], doing: [], done: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     const load = () =>
-      fetch("/api/tasks")
+      fetch(`/api/tasks?date=${date}`)
         .then((r) => r.json())
         .then((data) => { setTasks(data as TasksByStatus); setLoading(false); })
         .catch(() => setLoading(false));
     load();
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [date]);
 
-  if (loading) return <div className="text-zinc-500">Loading...</div>;
+  const isToday = date === todayStr();
 
   const allTasks = [...tasks.todo, ...tasks.doing, ...tasks.done];
   const topLevel = allTasks.filter((t) => !t.parent_id);
@@ -35,19 +52,50 @@ export function Board() {
     subtasksByParent.set(t.parent_id, list);
   }
 
-  if (topLevel.length === 0) {
-    return <div className="text-zinc-500 italic">No tasks</div>;
-  }
-
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
-      {topLevel.map((task) => (
-        <TaskColumn
-          key={task.id}
-          task={task}
-          subtasks={subtasksByParent.get(task.id) ?? []}
-        />
-      ))}
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={() => setDate(shiftDate(date, -1))}
+          className="text-zinc-400 hover:text-zinc-200 px-2 py-1 text-lg"
+        >
+          &larr;
+        </button>
+        <span className="text-sm font-medium text-zinc-300">
+          {date}{isToday ? " (today)" : ""}
+        </span>
+        <button
+          onClick={() => setDate(shiftDate(date, 1))}
+          className="text-zinc-400 hover:text-zinc-200 px-2 py-1 text-lg disabled:opacity-30"
+          disabled={isToday}
+        >
+          &rarr;
+        </button>
+        {!isToday && (
+          <button
+            onClick={() => setDate(todayStr())}
+            className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
+          >
+            Today
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="text-zinc-500">Loading...</div>
+      ) : topLevel.length === 0 ? (
+        <div className="text-zinc-500 italic">No tasks for {date}</div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {topLevel.map((task) => (
+            <TaskColumn
+              key={task.id}
+              task={task}
+              subtasks={subtasksByParent.get(task.id) ?? []}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

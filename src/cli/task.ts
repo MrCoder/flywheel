@@ -1,4 +1,4 @@
-import { createTask, findTaskByTitle, updateTaskStatus, listTasksByStatus, type Task } from "../db/index.js";
+import { createTask, createActivity, findTaskByTitle, updateTaskStatus, listTasksByStatus, today, type Task } from "../db/index.js";
 
 const STATUS_ICONS: Record<string, string> = { todo: "\u00b7", doing: "\u25cb", done: "\u2713" };
 
@@ -22,10 +22,12 @@ export function taskStart(title: string, project?: string, parentTitle?: string)
   const existing = findTaskByTitle(title);
   if (existing) {
     updateTaskStatus(existing.id, "doing");
+    createActivity(`Started: ${title}`, existing.project ?? project, existing.id);
     console.log(`Moved to DOING: ${title}`);
   } else {
     const parentId = resolveParentId(parentTitle);
-    createTask(title, "doing", project, undefined, parentId);
+    const task = createTask(title, "doing", project, undefined, parentId);
+    createActivity(`Started: ${title}`, task.project ?? undefined, task.id);
     console.log(`Created DOING: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
   }
 }
@@ -34,21 +36,27 @@ export function taskDone(title: string): void {
   const existing = findTaskByTitle(title);
   if (existing) {
     updateTaskStatus(existing.id, "done");
+    createActivity(`Completed: ${title}`, existing.project ?? undefined, existing.id);
     console.log(`Moved to DONE: ${title}`);
   } else {
-    createTask(title, "done");
+    const task = createTask(title, "done");
+    createActivity(`Completed: ${title}`, task.project ?? undefined, task.id);
     console.log(`Created as DONE: ${title}`);
   }
 }
 
 export function taskTodo(title: string, project?: string, parentTitle?: string): void {
   const parentId = resolveParentId(parentTitle);
-  createTask(title, "todo", project, undefined, parentId);
+  const task = createTask(title, "todo", project, undefined, parentId);
+  createActivity(`Added: ${title}`, task.project ?? undefined, task.id);
   console.log(`Added TODO: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
 }
 
-export function taskList(): void {
-  const { todo, doing, done } = listTasksByStatus();
+export function taskList(date?: string): void {
+  const d = date ?? today();
+  const { todo, doing, done } = listTasksByStatus(d);
+
+  console.log(`\n=== Tasks for ${d}${d === today() ? " (today)" : ""} ===`);
 
   const printColumn = (tasks: Task[], limit?: number) => {
     const tops = tasks.filter((t) => !t.parent_id);
