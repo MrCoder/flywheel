@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TaskColumn, type Task } from "./TaskCard.js";
 
 interface TasksByStatus {
@@ -27,17 +27,27 @@ export function Board() {
   const [tasks, setTasks] = useState<TasksByStatus>({ todo: [], doing: [], done: [] });
   const [loading, setLoading] = useState(true);
 
+  const loadTasks = useCallback(() => {
+    fetch(`/api/tasks?date=${date}`)
+      .then((r) => r.json())
+      .then((data) => { setTasks(data as TasksByStatus); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [date]);
+
   useEffect(() => {
     setLoading(true);
-    const load = () =>
-      fetch(`/api/tasks?date=${date}`)
-        .then((r) => r.json())
-        .then((data) => { setTasks(data as TasksByStatus); setLoading(false); })
-        .catch(() => setLoading(false));
-    load();
-    const id = setInterval(load, 5000);
+    loadTasks();
+    const id = setInterval(loadTasks, 5000);
     return () => clearInterval(id);
-  }, [date]);
+  }, [loadTasks]);
+
+  const handleDone = useCallback((id: string) => {
+    fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done" }),
+    }).then(() => loadTasks());
+  }, [loadTasks]);
 
   const isToday = date === todayStr();
 
@@ -92,6 +102,7 @@ export function Board() {
               key={task.id}
               task={task}
               subtasks={subtasksByParent.get(task.id) ?? []}
+              onDone={handleDone}
             />
           ))}
         </div>

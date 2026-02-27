@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import {
   listTasksByStatus,
+  updateTaskStatus,
+  createActivity,
+  findTaskById,
   listMemories,
   searchMemories,
   listDailySummaries,
@@ -14,6 +17,21 @@ export const api = new Hono();
 api.get("/tasks", (c) => {
   const date = c.req.query("date");
   return c.json(listTasksByStatus(date));
+});
+
+api.patch("/tasks/:id", async (c) => {
+  const id = c.req.param("id");
+  const { status } = await c.req.json<{ status: string }>();
+  if (!["todo", "doing", "done"].includes(status)) {
+    return c.json({ error: "Invalid status" }, 400);
+  }
+  const task = findTaskById(id);
+  if (!task) return c.json({ error: "Not found" }, 404);
+  updateTaskStatus(id, status as "todo" | "doing" | "done");
+  if (status === "done") {
+    createActivity(`Completed: ${task.title}`, task.project ?? undefined, task.id);
+  }
+  return c.json({ ok: true });
 });
 
 api.get("/memories", (c) => {
