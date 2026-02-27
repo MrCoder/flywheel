@@ -2,11 +2,15 @@ import { morning } from "./morning.js";
 import { taskStart, taskDone, taskTodo, taskList } from "./task.js";
 import { remember, search, recent } from "./remember.js";
 import { listSkills } from "./skills.js";
-import { createActivity } from "../db/index.js";
+import { createActivity, ensureTasksCarriedForward } from "../db/index.js";
 
 const [command, subcommand, ...args] = process.argv.slice(2);
 
 async function main() {
+  // Auto carry-forward incomplete tasks from previous day
+  const cf = ensureTasksCarriedForward();
+  if (cf.cloned > 0) console.log(`Carried forward ${cf.cloned} tasks from previous day\n`);
+
   switch (command) {
     case "morning":
       await morning();
