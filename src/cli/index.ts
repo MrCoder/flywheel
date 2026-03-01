@@ -3,6 +3,7 @@ import { taskStart, taskDone, taskTodo, taskList } from "./task.js";
 import { remember, search, recent } from "./remember.js";
 import { listSkills } from "./skills.js";
 import { createActivity, ensureTasksCarriedForward } from "../db/index.js";
+import { generateDashboard } from "../html/generate.js";
 
 const [command, subcommand, ...args] = process.argv.slice(2);
 
@@ -11,24 +12,30 @@ async function main() {
   const cf = ensureTasksCarriedForward();
   if (cf.cloned > 0) console.log(`Carried forward ${cf.cloned} tasks from previous day\n`);
 
+  let shouldRegenerate = false;
+
   switch (command) {
     case "morning":
       await morning();
+      shouldRegenerate = true;
       break;
 
     case "task":
       switch (subcommand) {
         case "start":
           if (!args[0]) { console.error("Usage: bun run cli task start <title> [--project <name>] [--parent <title>]"); process.exit(1); }
-          taskStart(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
+          await taskStart(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
+          shouldRegenerate = true;
           break;
         case "done":
           if (!args[0]) { console.error("Usage: bun run cli task done <title>"); process.exit(1); }
-          taskDone(args[0]);
+          await taskDone(args[0]);
+          shouldRegenerate = true;
           break;
         case "todo":
           if (!args[0]) { console.error("Usage: bun run cli task todo <title> [--project <name>] [--parent <title>]"); process.exit(1); }
-          taskTodo(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
+          await taskTodo(args[0], parseFlag(args, "--project"), parseFlag(args, "--parent"));
+          shouldRegenerate = true;
           break;
         case "list":
           taskList(parseFlag(args, "--date"));
@@ -42,6 +49,7 @@ async function main() {
     case "remember":
       if (!subcommand) { console.error("Usage: bun run cli remember <content> [--project <name>] [--tags <tags>]"); process.exit(1); }
       remember(subcommand, parseFlag(args, "--project"), parseFlag(args, "--tags"));
+      shouldRegenerate = true;
       break;
 
     case "search":
@@ -57,10 +65,15 @@ async function main() {
       if (!subcommand) { console.error("Usage: bun run cli log <message> [--project <name>]"); process.exit(1); }
       createActivity(subcommand, parseFlag(args, "--project"));
       console.log(`Logged: ${subcommand}`);
+      shouldRegenerate = true;
       break;
 
     case "skills":
       listSkills();
+      break;
+
+    case "generate":
+      generateDashboard();
       break;
 
     default:
@@ -78,12 +91,20 @@ Commands:
   bun run cli memories [limit]             Show recent memories
   bun run cli log <message>                 Log an activity
   bun run cli skills                       List Claude skills & commands
+  bun run cli generate                     Regenerate dashboard HTML
 
 Flags (for task/remember):
   --project <name>                         Associate with project
   --parent <title>                         Create as subtask of parent (task only)
   --tags <comma,separated>                 Add tags (remember only)
 `);
+  }
+
+  // Regenerate carry-forward changes too
+  if (!shouldRegenerate && cf.cloned > 0) shouldRegenerate = true;
+
+  if (shouldRegenerate) {
+    try { generateDashboard(); } catch { /* CLI output is primary */ }
   }
 }
 

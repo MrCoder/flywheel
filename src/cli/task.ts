@@ -1,4 +1,5 @@
 import { createTask, createActivity, findTaskByTitle, updateTaskStatus, listTasksByStatus, today, type Task } from "../db/index.js";
+import { resolveTaskTitle } from "./match.js";
 
 const STATUS_ICONS: Record<string, string> = { todo: "\u00b7", doing: "\u25cb", done: "\u2713" };
 
@@ -18,26 +19,28 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export function taskStart(title: string, project?: string, parentTitle?: string): void {
-  const existing = findTaskByTitle(title);
+export async function taskStart(title: string, project?: string, parentTitle?: string): Promise<void> {
+  const resolvedTitle = await resolveTaskTitle(title) ?? title;
+  const existing = findTaskByTitle(resolvedTitle);
   if (existing) {
     updateTaskStatus(existing.id, "doing");
-    createActivity(`Started: ${title}`, existing.project ?? project, existing.id);
-    console.log(`Moved to DOING: ${title}`);
+    createActivity(`Started: ${resolvedTitle}`, existing.project ?? project, existing.id);
+    console.log(`Moved to DOING: ${resolvedTitle}`);
   } else {
-    const parentId = resolveParentId(parentTitle);
+    const parentId = await resolveParentId(parentTitle);
     const task = createTask(title, "doing", project, undefined, parentId);
     createActivity(`Started: ${title}`, task.project ?? undefined, task.id);
     console.log(`Created DOING: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
   }
 }
 
-export function taskDone(title: string): void {
-  const existing = findTaskByTitle(title);
+export async function taskDone(title: string): Promise<void> {
+  const resolvedTitle = await resolveTaskTitle(title) ?? title;
+  const existing = findTaskByTitle(resolvedTitle);
   if (existing) {
     updateTaskStatus(existing.id, "done");
-    createActivity(`Completed: ${title}`, existing.project ?? undefined, existing.id);
-    console.log(`Moved to DONE: ${title}`);
+    createActivity(`Completed: ${resolvedTitle}`, existing.project ?? undefined, existing.id);
+    console.log(`Moved to DONE: ${resolvedTitle}`);
   } else {
     const task = createTask(title, "done");
     createActivity(`Completed: ${title}`, task.project ?? undefined, task.id);
@@ -45,11 +48,18 @@ export function taskDone(title: string): void {
   }
 }
 
-export function taskTodo(title: string, project?: string, parentTitle?: string): void {
-  const parentId = resolveParentId(parentTitle);
-  const task = createTask(title, "todo", project, undefined, parentId);
-  createActivity(`Added: ${title}`, task.project ?? undefined, task.id);
-  console.log(`Added TODO: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
+export async function taskTodo(title: string, project?: string, parentTitle?: string): Promise<void> {
+  const resolvedTitle = await resolveTaskTitle(title) ?? title;
+  const existing = findTaskByTitle(resolvedTitle);
+  if (existing) {
+    updateTaskStatus(existing.id, "todo");
+    console.log(`Moved to TODO: ${resolvedTitle}`);
+  } else {
+    const parentId = await resolveParentId(parentTitle);
+    const task = createTask(title, "todo", project, undefined, parentId);
+    createActivity(`Added: ${title}`, task.project ?? undefined, task.id);
+    console.log(`Added TODO: ${title}${parentTitle ? ` (subtask of "${parentTitle}")` : ""}`);
+  }
 }
 
 export function taskList(date?: string): void {
@@ -87,9 +97,10 @@ export function taskList(date?: string): void {
   console.log("");
 }
 
-function resolveParentId(parentTitle?: string): string | undefined {
+async function resolveParentId(parentTitle?: string): Promise<string | undefined> {
   if (!parentTitle) return undefined;
-  const parent = findTaskByTitle(parentTitle);
+  const resolvedTitle = await resolveTaskTitle(parentTitle) ?? parentTitle;
+  const parent = findTaskByTitle(resolvedTitle);
   if (!parent) {
     console.error(`Parent task not found: "${parentTitle}"`);
     process.exit(1);
