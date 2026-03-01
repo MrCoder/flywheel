@@ -1,12 +1,29 @@
-import { createTask, createActivity, findTaskByTitle, updateTaskStatus, listTasksByStatus, today, type Task } from "../db/index.js";
+import { createTask, createActivity, findTaskByTitle, updateTaskStatus, listTasks, today, type Task } from "../db/index.js";
 import { resolveTaskTitle } from "./match.js";
 
-const STATUS_ICONS: Record<string, string> = { todo: "\u00b7", doing: "\u25cb", done: "\u2713" };
+// ANSI escape codes
+const RESET = "\x1b[0m";
+const BOLD = "\x1b[1m";
+const DIM = "\x1b[2m";
+const GREEN = "\x1b[32m";
+const STRIKETHROUGH = "\x1b[9m";
 
-function formatTask(task: Task): string {
+function formatTask(task: Task, indent: number = 2): string {
   const project = task.project ? ` [${task.project}]` : "";
   const age = timeAgo(task.updated_at);
-  return `  ${task.title}${project} (${age})`;
+  const pad = " ".repeat(indent);
+  const meta = `${DIM}${project} (${age})${RESET}`;
+
+  switch (task.status) {
+    case "done":
+      return `${pad}${GREEN}${STRIKETHROUGH}✓ ${task.title}${RESET} ${meta}`;
+    case "doing":
+      return `${pad}${BOLD}■ ${task.title}${RESET} ${meta}`;
+    case "todo":
+      return `${pad}${DIM}□ ${task.title}${meta}${RESET}`;
+    default:
+      return `${pad}  ${task.title}${meta}`;
+  }
 }
 
 function timeAgo(iso: string): string {
@@ -64,35 +81,53 @@ export async function taskTodo(title: string, project?: string, parentTitle?: st
 
 export function taskList(date?: string): void {
   const d = date ?? today();
-  const { todo, doing, done } = listTasksByStatus(d);
+  const all = listTasks(undefined, d);
 
-  console.log(`\n=== Tasks for ${d}${d === today() ? " (today)" : ""} ===`);
+  const label = d === today() ? " (today)" : "";
+  console.log(`\nTasks for ${d}${label}\n`);
 
-  const printColumn = (tasks: Task[], limit?: number) => {
-    const tops = tasks.filter((t) => !t.parent_id);
-    const subs = tasks.filter((t) => t.parent_id);
-    if (tops.length === 0 && subs.length === 0) { console.log("  (none)"); return; }
-    for (const t of limit ? tops.slice(0, limit) : tops) {
-      console.log(formatTask(t));
-      const children = subs.filter((s) => s.parent_id === t.id);
+  const parents = all.filter((t) => !t.parent_id);
+  const subs = all.filter((t) => t.parent_id);
+  const subsByParent = new Map<string, Task[]>();
+  for (const s of subs) {
+    const list = subsByParent.get(s.parent_id!) ?? [];
+    list.push(s);
+    subsByParent.set(s.parent_id!, list);
+  }
+
+  // Order parents: doing → todo → done (capped at 10)
+  const statusOrder: Record<string, number> = { doing: 0, todo: 1, done: 2 };
+  parents.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
+
+  // Cap done parents at 10
+  let doneCount = 0;
+  const visible: Task[] = [];
+  for (const p of parents) {
+    if (p.status === "done") {
+      if (doneCount >= 10) continue;
+      doneCount++;
+    }
+    visible.push(p);
+  }
+
+  if (visible.length === 0) {
+    console.log(`${DIM}  (no tasks)${RESET}`);
+  }
+
+  for (const p of visible) {
+    console.log(formatTask(p));
+    const children = subsByParent.get(p.id);
+    if (children) {
       for (const c of children) {
-        console.log(`    ${STATUS_ICONS[c.status] ?? "·"} ${c.title} (${timeAgo(c.updated_at)})`);
+        console.log(formatTask(c, 4));
       }
     }
-    // Orphan subtasks whose parent is in a different column
-    const shownParentIds = new Set(tops.map((t) => t.id));
-    const orphans = subs.filter((s) => !shownParentIds.has(s.parent_id!));
-    for (const o of orphans) console.log(formatTask(o));
-  };
+  }
 
-  console.log("\n=== DOING ===");
-  printColumn(doing);
-
-  console.log("\n=== TODO ===");
-  printColumn(todo);
-
-  console.log("\n=== DONE (recent) ===");
-  printColumn(done, 10);
+  // Orphan subtasks whose parent isn't in this day's data
+  const parentIds = new Set(parents.map((t) => t.id));
+  const orphans = subs.filter((s) => !parentIds.has(s.parent_id!));
+  for (const o of orphans) console.log(formatTask(o));
 
   console.log("");
 }
